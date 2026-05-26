@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 12px; }
+    h2 { margin-top: 0; font-size: 18px; color: #333; }
+
+    label { font-weight: 500; display: block; margin: 6px 0; }
+    input[type=text] {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-top: 4px;
+    }
+    input[type=range] { width: 100%; }
+
+    button {
+      width: 100%;
+      background-color: #4285F4;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px;
+      margin-top: 16px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #357AE8; }
+
+    .section {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-top: 12px;
+      padding: 10px;
+      background: #fafafa;
+    }
+    .section h3 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      color: #444;
+    }
+    .checkbox-list label {
+      font-weight: normal;
+      display: flex;
+      align-items: center;
+    }
+    .checkbox-list input[type=checkbox] {
+      margin-right: 8px;
+    }
+    #status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h2>Search Resources</h2>
+
+  <label for="address">Client Address</label>
+  <input type="text" id="address" placeholder="123 Main St, City, State">
+
+  <label for="radius">Radius: <span id="radiusValue">5</span> miles</label>
+  <input type="range" id="radius" min="1" max="50" value="5"
+         oninput="document.getElementById('radiusValue').innerText = this.value">
+
+  <!-- Categories -->
+  <div class="section">
+    <h3>Categories</h3>
+    <div id="categoryContainer" class="checkbox-list"></div>
+  </div>
+
+  <!-- Subcategories -->
+  <div class="section">
+    <h3>Subcategories</h3>
+    <div id="subcategoryContainer" class="checkbox-list"></div>
+  </div>
+
+  <button onclick="runSearch()">🔍 Search</button>
+  <div id="status"></div>
+
+  <script>
+  let serverData = {
+    categories: [],
+    subcategoriesFlat: [],
+    categoryToSubcategories: {}
+  };
+
+  // Render categories and attach change handlers
+  function renderCategories() {
+    const catDiv = document.getElementById("categoryContainer");
+    catDiv.innerHTML = "";
+    serverData.categories.forEach(c => {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="checkbox" value="${escapeHtml(c)}"> ${escapeHtml(c)}`;
+      catDiv.appendChild(label);
+    });
+
+    // listen for category checkbox changes to update subcategory list
+    catDiv.addEventListener("change", updateSubcategoryList);
+  }
+
+  // Render subcategories according to selected categories
+  function updateSubcategoryList() {
+    const subDiv = document.getElementById("subcategoryContainer");
+    subDiv.innerHTML = "";
+
+    // which categories are selected?
+    const selectedCats = Array.from(
+      document.querySelectorAll("#categoryContainer input[type=checkbox]:checked")
+    ).map(cb => cb.value);
+
+    let subsToShow = new Set();
+
+    if (selectedCats.length === 0) {
+      // No categories selected => show ALL subcategories
+      serverData.subcategoriesFlat.forEach(s => subsToShow.add(s));
+    } else {
+      // Union of subcategories for all selected categories
+      selectedCats.forEach(cat => {
+        const arr = serverData.categoryToSubcategories[cat] || [];
+        arr.forEach(s => subsToShow.add(s));
+      });
+    }
+
+    // Sort and render
+    [...subsToShow].sort().forEach(s => {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="checkbox" value="${escapeHtml(s)}"> ${escapeHtml(s)}`;
+      subDiv.appendChild(label);
+    });
+  }
+
+  function runSearch() {
+    const status = document.getElementById("status");
+    status.innerHTML = "Searching...";
+
+    const selectedCategories = Array.from(
+      document.querySelectorAll("#categoryContainer input[type=checkbox]:checked")
+    ).map(cb => cb.value);
+
+    const selectedSubcategories = Array.from(
+      document.querySelectorAll("#subcategoryContainer input[type=checkbox]:checked")
+    ).map(cb => cb.value);
+
+    const form = {
+      address: document.getElementById("address").value.trim(),
+      radius: document.getElementById("radius").value,
+      categories: selectedCategories,
+      subcategories: selectedSubcategories
+    };
+
+    google.script.run
+      .withSuccessHandler(msg => { status.textContent = msg; })
+      .withFailureHandler(err => { status.textContent = "Error: " + err.message; })
+      .runSearchFromSidebar(form);
+  }
+
+  // Load categories+mapping from server and render
+  google.script.run
+    .withSuccessHandler(data => {
+      // store for local use
+      serverData.categories = data.categories || [];
+      serverData.subcategoriesFlat = data.subcategoriesFlat || [];
+      serverData.categoryToSubcategories = data.categoryToSubcategories || {};
+
+      renderCategories();
+      updateSubcategoryList(); // populate subcategories (all by default)
+    })
+    .withFailureHandler(err => {
+      document.getElementById("status").textContent = "Failed to load lists.";
+      console.error(err);
+    })
+    .getCategoriesAndSubcategories();
+
+  // small helper: escape text for safe insertion into innerHTML for checkbox values/labels
+  function escapeHtml(s) {
+    if (s == null) return "";
+    return (s + "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+</script>
+</body>
+</html>
