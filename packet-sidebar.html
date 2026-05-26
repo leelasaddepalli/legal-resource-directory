@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 12px; }
+    h3 { margin-top: 0; }
+    label { display: block; margin-top: 8px; font-weight: 600; }
+    input[type=text] { width: 100%; padding: 6px; margin-top: 4px; border-radius: 6px; border: 1px solid #ccc; }
+    button { width: 100%; padding: 10px; margin-top: 12px; background: #2F80ED; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    #status { margin-top: 10px; color: #333; font-size: 13px; }
+    a.link { color: #2F80ED; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h3>Create Printable Resource Packet (Google Doc)</h3>
+
+  <div id="matchesInfo">Checking for matched results...</div>
+
+  <label for="clientName">Client Name</label>
+  <input type="text" id="clientName" placeholder="Client's full name">
+
+  <label for="advocateName">Advocate / Writer Name</label>
+  <input type="text" id="advocateName" placeholder="Your name">
+
+  <label for="advocatePhone">Advocate Phone</label>
+<input type="text" id="advocatePhone" placeholder="123-456-7890">
+
+<label for="advocateEmail">Advocate Email</label>
+<input type="text" id="advocateEmail" placeholder="email@example.com">
+
+  <button id="generateBtn" onclick="generatePacket()">Create Google Doc</button>
+
+  <div id="status"></div>
+
+  <script>
+    // Show matches count on load
+    function refreshCount() {
+      google.script.run
+        .withSuccessHandler(function(count) {
+          const el = document.getElementById('matchesInfo');
+          el.textContent = count + " matched result(s) found in 'Search Results'.";
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('matchesInfo').textContent = "Could not read 'Search Results' sheet.";
+          console.error(err);
+        })
+        .getMatchesCount();
+    }
+
+    refreshCount();
+
+    function generatePacket() {
+  const clientName = document.getElementById('clientName').value.trim();
+  const advocateName = document.getElementById('advocateName').value.trim();
+  const advocatePhone = document.getElementById('advocatePhone').value.trim();
+  const advocateEmail = document.getElementById('advocateEmail').value.trim();
+
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = "Generating document…";
+
+  google.script.run
+    .withSuccessHandler(function(url) {
+      statusEl.innerHTML = `Document created: <a href="${url}" target="_blank" class="link">Open Document</a>`;
+    })
+    .withFailureHandler(function(err) {
+      statusEl.textContent = "Error: " + (err.message || err);
+    })
+    .generateResourcePacket(clientName, advocateName, advocatePhone, advocateEmail);
+}
+  </script>
+</body>
+</html>
